@@ -106,18 +106,15 @@ const ChatInterface = ({
       // ✅ FIXED: Text Generation
       if (mode === "text") {
         console.log("📝 Sending text request:", content);
-        let aiText = "";
-
         try {
           const response = await puter.ai.chat(content);
           console.log("📝 AI Response:", response);
-          aiText = response.text || "Error: No response received.";
+
+          aiResponse.content = response?.text || "Error: No response received.";
         } catch (error) {
           console.error("❌ Text Generation Error:", error);
-          aiText = "Error: Failed to generate response.";
+          aiResponse.content = "Error: Failed to generate response.";
         }
-
-        aiResponse.content = aiText;
       }
 
       // ✅ FIXED: Image Analysis (Uploads before analyzing)
