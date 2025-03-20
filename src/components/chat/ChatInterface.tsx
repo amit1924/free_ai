@@ -111,29 +111,44 @@ const ChatInterface = ({
         }
 
         aiResponse.content = aiText || "Error: No response received.";
+      } 
 
-      } else if (mode === "imageAnalysis") {
+      else if (mode === "imageAnalysis") {
         if (!file) {
           aiResponse.content = "Please upload an image for me to analyze.";
         } else {
+          // ✅ Upload the file first
+          const uploadedImage = await puter.storage.upload(file);
+          console.log("Uploaded Image URL:", uploadedImage.url);
+
+          // ✅ Now analyze the uploaded image
           const imageAnalysisResponse = await puter.ai.chat(
-            "What do you see in this image?",
-            userMessage.imageUrl!
+            "Analyze this image for me.",
+            { image: uploadedImage.url }
           );
+          
           aiResponse.content = imageAnalysisResponse.text || "Error: No response received.";
         }
+      } 
 
-      } else if (mode === "imageGeneration") {
+      else if (mode === "imageGeneration") {
         toast({
           title: "Generating image...",
           description: "Please wait while the AI creates an image.",
         });
 
+        // ✅ Ensure image generation works correctly
         const generatedImage = await puter.ai.txt2img(content);
-        aiResponse.content = "Here's your generated image.";
-        aiResponse.imageUrl = generatedImage.src;
-        aiResponse.imageAlt = "Generated AI image";
-        aiResponse.isGeneratedImage = true;
+        console.log("Generated Image:", generatedImage);
+
+        if (generatedImage && generatedImage.url) {
+          aiResponse.content = "Here's your generated image.";
+          aiResponse.imageUrl = generatedImage.url;
+          aiResponse.imageAlt = "Generated AI image";
+          aiResponse.isGeneratedImage = true;
+        } else {
+          aiResponse.content = "Error: Image generation failed.";
+        }
       }
 
       addMessage(aiResponse);
