@@ -2,12 +2,12 @@ import React, { useState } from "react";
 import MessageThread from "./MessageThread";
 import ModeToggle from "./ModeToggle";
 import InputArea from "./InputArea";
-import TypingIndicator from "./TypingIndicator";
 import { useToast } from "@/components/ui/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 
 declare const puter: any; // ✅ Declare Puter.js global variable
 
+// Message Type Definition
 export interface MessageType {
   id: string;
   content: string;
@@ -18,6 +18,7 @@ export interface MessageType {
   isGeneratedImage?: boolean;
 }
 
+// Chat Mode Definition
 export type ChatMode = "text" | "imageAnalysis" | "imageGeneration";
 
 interface ChatInterfaceProps {
@@ -41,7 +42,7 @@ const ChatInterface = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
 
-  // Handle mode change
+  // Handle Mode Change
   const handleModeChange = (newMode: ChatMode) => {
     setMode(newMode);
 
@@ -59,12 +60,12 @@ const ChatInterface = ({
     });
   };
 
-  // Add a new message to the chat
+  // Add Message to the Chat
   const addMessage = (message: MessageType) => {
     setMessages((prev) => [...prev, message]);
   };
 
-  // Handle sending a message
+  // Handle Sending a Message
   const handleSendMessage = async (content: string, file?: File) => {
     if (!content.trim() && !file) return;
 
@@ -91,27 +92,43 @@ const ChatInterface = ({
         timestamp: new Date(),
       };
 
+      if (!puter || !puter.ai) {
+        console.error("Puter.js is not loaded.");
+        toast({
+          title: "Error",
+          description: "Puter.js failed to load. Please refresh the page.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       if (mode === "text") {
-        // ✅ Get AI response via Puter.js
-        const textResponse = await puter.ai.chat(content);
-        aiResponse.content = textResponse;
+        let aiText = "";
+        const response = await puter.ai.chat(content, { stream: true });
+
+        for await (const part of response) {
+          aiText += part?.text || "";
+        }
+
+        aiResponse.content = aiText || "Error: No response received.";
 
       } else if (mode === "imageAnalysis") {
         if (!file) {
           aiResponse.content = "Please upload an image for me to analyze.";
         } else {
-          // ✅ Use the correct Puter.js function for image analysis
           const imageAnalysisResponse = await puter.ai.chat(
-            "What do you see in this image?", 
+            "What do you see in this image?",
             userMessage.imageUrl!
           );
-          aiResponse.content = imageAnalysisResponse;
+          aiResponse.content = imageAnalysisResponse.text || "Error: No response received.";
         }
 
       } else if (mode === "imageGeneration") {
-        toast({ title: "Generating image...", description: "Please wait while the AI creates an image." });
+        toast({
+          title: "Generating image...",
+          description: "Please wait while the AI creates an image.",
+        });
 
-        // ✅ Generate AI Image via Puter.js
         const generatedImage = await puter.ai.txt2img(content);
         aiResponse.content = "Here's your generated image.";
         aiResponse.imageUrl = generatedImage.src;
@@ -134,12 +151,15 @@ const ChatInterface = ({
 
   return (
     <div className="flex flex-col h-full w-full max-w-4xl mx-auto bg-background rounded-lg shadow-lg overflow-hidden">
+      {/* Header */}
       <div className="p-4 border-b">
         <h1 className="text-2xl font-bold text-center">AI Assistant</h1>
       </div>
 
+      {/* Mode Toggle */}
       <ModeToggle selectedMode={mode} onModeChange={handleModeChange} />
 
+      {/* Message Thread */}
       <div className="flex-1 overflow-hidden">
         <Card className="h-full border-0 shadow-none">
           <CardContent className="p-0 h-full">
@@ -148,6 +168,7 @@ const ChatInterface = ({
         </Card>
       </div>
 
+      {/* Input Area */}
       <InputArea
         mode={mode}
         onSendMessage={handleSendMessage}
