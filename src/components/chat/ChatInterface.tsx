@@ -6,8 +6,7 @@ import TypingIndicator from "./TypingIndicator";
 import { useToast } from "@/components/ui/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 
-// Import Puter.js (Ensure this is installed in your project)
-import puter from "puter-js";
+declare const puter: any; // ✅ Declare Puter.js global variable
 
 export interface MessageType {
   id: string;
@@ -46,7 +45,6 @@ const ChatInterface = ({
   const handleModeChange = (newMode: ChatMode) => {
     setMode(newMode);
 
-    // Add a system message when mode changes
     const modeMessages = {
       text: "Switched to Text Chat mode. Ask me anything!",
       imageAnalysis: "Switched to Image Analysis mode. Upload an image for me to analyze.",
@@ -70,7 +68,6 @@ const ChatInterface = ({
   const handleSendMessage = async (content: string, file?: File) => {
     if (!content.trim() && !file) return;
 
-    // Add user message
     const userMessage: MessageType = {
       id: Date.now().toString(),
       content: content.trim(),
@@ -78,7 +75,6 @@ const ChatInterface = ({
       timestamp: new Date(),
     };
 
-    // If there's an image file in image analysis mode
     if (mode === "imageAnalysis" && file) {
       userMessage.imageUrl = URL.createObjectURL(file);
       userMessage.imageAlt = file.name;
@@ -96,7 +92,7 @@ const ChatInterface = ({
       };
 
       if (mode === "text") {
-        // 🔥 Get real AI response
+        // ✅ Get AI response via Puter.js
         const textResponse = await puter.ai.chat(content);
         aiResponse.content = textResponse;
 
@@ -104,17 +100,20 @@ const ChatInterface = ({
         if (!file) {
           aiResponse.content = "Please upload an image for me to analyze.";
         } else {
-          // 🔥 Get real AI image analysis
-          const imageAnalysisResponse = await puter.ai.chat("What do you see in this image?", userMessage.imageUrl!);
+          // ✅ Use the correct Puter.js function for image analysis
+          const imageAnalysisResponse = await puter.ai.chat(
+            "What do you see in this image?", 
+            userMessage.imageUrl!
+          );
           aiResponse.content = imageAnalysisResponse;
         }
 
       } else if (mode === "imageGeneration") {
-        // 🔥 Generate AI Image
         toast({ title: "Generating image...", description: "Please wait while the AI creates an image." });
 
+        // ✅ Generate AI Image via Puter.js
         const generatedImage = await puter.ai.txt2img(content);
-        aiResponse.content = "Here's your generated image based on your prompt.";
+        aiResponse.content = "Here's your generated image.";
         aiResponse.imageUrl = generatedImage.src;
         aiResponse.imageAlt = "Generated AI image";
         aiResponse.isGeneratedImage = true;
@@ -123,7 +122,11 @@ const ChatInterface = ({
       addMessage(aiResponse);
     } catch (error) {
       console.error("Puter AI Error:", error);
-      toast({ title: "Error", description: "Failed to process your request. Please try again.", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: "Failed to process your request. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -146,13 +149,7 @@ const ChatInterface = ({
       </div>
 
       <InputArea
-        mode={
-          mode === "imageAnalysis"
-            ? "image-analysis"
-            : mode === "imageGeneration"
-              ? "image-generation"
-              : "text"
-        }
+        mode={mode}
         onSendMessage={handleSendMessage}
         isProcessing={isProcessing}
       />
