@@ -5,9 +5,10 @@ import InputArea from "./InputArea";
 import TypingIndicator from "./TypingIndicator";
 import { useToast } from "@/components/ui/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
-import puter from "puter.js"; // Ensure you have the correct import for Puter.js
 
-// Define types
+// Import Puter.js (Ensure this is installed in your project)
+import puter from "puter-js";
+
 export interface MessageType {
   id: string;
   content: string;
@@ -41,16 +42,12 @@ const ChatInterface = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
 
-  // Add a new message to the chat
-  const addMessage = (message: MessageType) => {
-    setMessages((prev) => [...prev, message]);
-  };
-
   // Handle mode change
   const handleModeChange = (newMode: ChatMode) => {
     setMode(newMode);
 
-    const modeMessages: Record<ChatMode, string> = {
+    // Add a system message when mode changes
+    const modeMessages = {
       text: "Switched to Text Chat mode. Ask me anything!",
       imageAnalysis: "Switched to Image Analysis mode. Upload an image for me to analyze.",
       imageGeneration: "Switched to Image Generation mode. Describe the image you'd like me to create.",
@@ -62,6 +59,11 @@ const ChatInterface = ({
       isUser: false,
       timestamp: new Date(),
     });
+  };
+
+  // Add a new message to the chat
+  const addMessage = (message: MessageType) => {
+    setMessages((prev) => [...prev, message]);
   };
 
   // Handle sending a message
@@ -76,6 +78,7 @@ const ChatInterface = ({
       timestamp: new Date(),
     };
 
+    // If there's an image file in image analysis mode
     if (mode === "imageAnalysis" && file) {
       userMessage.imageUrl = URL.createObjectURL(file);
       userMessage.imageAlt = file.name;
@@ -85,78 +88,42 @@ const ChatInterface = ({
     setIsProcessing(true);
 
     try {
-      // Show typing indicator
-      const typingMessage: MessageType = {
-        id: "typing",
-        content: "...",
+      let aiResponse: MessageType = {
+        id: Date.now().toString(),
+        content: "",
         isUser: false,
         timestamp: new Date(),
       };
-      addMessage(typingMessage);
 
-      let aiResponse: MessageType;
+      if (mode === "text") {
+        // 🔥 Get real AI response
+        const textResponse = await puter.ai.chat(content);
+        aiResponse.content = textResponse;
 
-      switch (mode) {
-        case "text":
-          const textResponse = await puter.ai.chat(content);
-          aiResponse = {
-            id: Date.now().toString(),
-            content: textResponse,
-            isUser: false,
-            timestamp: new Date(),
-          };
-          break;
+      } else if (mode === "imageAnalysis") {
+        if (!file) {
+          aiResponse.content = "Please upload an image for me to analyze.";
+        } else {
+          // 🔥 Get real AI image analysis
+          const imageAnalysisResponse = await puter.ai.chat("What do you see in this image?", userMessage.imageUrl!);
+          aiResponse.content = imageAnalysisResponse;
+        }
 
-        case "imageAnalysis":
-          if (!file) {
-            aiResponse = {
-              id: Date.now().toString(),
-              content: "Please upload an image for analysis.",
-              isUser: false,
-              timestamp: new Date(),
-            };
-          } else {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = async () => {
-              const imageBase64 = reader.result as string;
-              const analysisResponse = await puter.ai.chat("Analyze this image", imageBase64);
-              aiResponse = {
-                id: Date.now().toString(),
-                content: analysisResponse,
-                isUser: false,
-                timestamp: new Date(),
-              };
-              setMessages((prev) => [...prev.filter((msg) => msg.id !== "typing"), aiResponse]);
-            };
-            return;
-          }
-          break;
+      } else if (mode === "imageGeneration") {
+        // 🔥 Generate AI Image
+        toast({ title: "Generating image...", description: "Please wait while the AI creates an image." });
 
-        case "imageGeneration":
-          toast({ title: "Generating image...", description: "Please wait a moment." });
-          const generatedImage = await puter.ai.txt2img(content);
-          aiResponse = {
-            id: Date.now().toString(),
-            content: "Here is your generated image:",
-            imageUrl: generatedImage.src,
-            imageAlt: "Generated image based on your prompt",
-            isGeneratedImage: true,
-            isUser: false,
-            timestamp: new Date(),
-          };
-          break;
+        const generatedImage = await puter.ai.txt2img(content);
+        aiResponse.content = "Here's your generated image based on your prompt.";
+        aiResponse.imageUrl = generatedImage.src;
+        aiResponse.imageAlt = "Generated AI image";
+        aiResponse.isGeneratedImage = true;
       }
 
-      // Remove typing indicator and add AI response
-      setMessages((prev) => [...prev.filter((msg) => msg.id !== "typing"), aiResponse]);
+      addMessage(aiResponse);
     } catch (error) {
-      console.error("Error processing message:", error);
-      toast({
-        title: "Error",
-        description: "Failed to process your request. Please try again.",
-        variant: "destructive",
-      });
+      console.error("Puter AI Error:", error);
+      toast({ title: "Error", description: "Failed to process your request. Please try again.", variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
@@ -179,7 +146,13 @@ const ChatInterface = ({
       </div>
 
       <InputArea
-        mode={mode}
+        mode={
+          mode === "imageAnalysis"
+            ? "image-analysis"
+            : mode === "imageGeneration"
+              ? "image-generation"
+              : "text"
+        }
         onSendMessage={handleSendMessage}
         isProcessing={isProcessing}
       />
