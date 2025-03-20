@@ -5,7 +5,7 @@ import InputArea from "./InputArea";
 import { useToast } from "@/components/ui/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 
-declare const puter: any; // ✅ Ensure Puter.js global variable is available
+declare const puter: any; // ✅ Declare Puter.js global variable
 
 // Message Type Definition
 export interface MessageType {
@@ -92,9 +92,8 @@ const ChatInterface = ({
         timestamp: new Date(),
       };
 
-      // ✅ Ensure `puter.js` is available
       if (!puter || !puter.ai) {
-        console.error("❌ Puter.js is not loaded.");
+        console.error("Puter.js is not loaded.");
         toast({
           title: "Error",
           description: "Puter.js failed to load. Please refresh the page.",
@@ -103,77 +102,58 @@ const ChatInterface = ({
         return;
       }
 
-      // ✅ FIXED: Text Generation
       if (mode === "text") {
-        console.log("📝 Sending text request:", content);
-        try {
-          const response = await puter.ai.chat(content);
-          console.log("📝 AI Response:", response);
+        let aiText = "";
+        const response = await puter.ai.chat(content, { stream: true });
 
-          aiResponse.content = response?.text || "Error: No response received.";
-        } catch (error) {
-          console.error("❌ Text Generation Error:", error);
-          aiResponse.content = "Error: Failed to generate response.";
+        for await (const part of response) {
+          aiText += part?.text || "";
         }
-      }
 
-      // ✅ FIXED: Image Analysis (Uploads before analyzing)
+        aiResponse.content = aiText || "Error: No response received.";
+      } 
+
       else if (mode === "imageAnalysis") {
         if (!file) {
           aiResponse.content = "Please upload an image for me to analyze.";
         } else {
-          try {
-            console.log("📤 Uploading image...");
-            const uploadedImage = await puter.storage.upload(file);
-            console.log("✅ Uploaded Image URL:", uploadedImage?.url);
+          // ✅ Upload the file first
+          const uploadedImage = await puter.storage.upload(file);
+          console.log("Uploaded Image URL:", uploadedImage.url);
 
-            if (!uploadedImage?.url) {
-              aiResponse.content = "Error: Image upload failed.";
-            } else {
-              console.log("🔍 Analyzing image...");
-              const imageAnalysisResponse = await puter.ai.chat("Analyze this image for me.", {
-                image: uploadedImage.url,
-              });
-
-              console.log("🔍 AI Image Analysis Response:", imageAnalysisResponse);
-              aiResponse.content = imageAnalysisResponse?.text || "Error: No response received.";
-            }
-          } catch (error) {
-            console.error("❌ Image Analysis Error:", error);
-            aiResponse.content = "Error: Failed to analyze image.";
-          }
+          // ✅ Now analyze the uploaded image
+          const imageAnalysisResponse = await puter.ai.chat(
+            "Analyze this image for me.",
+            { image: uploadedImage.url }
+          );
+          
+          aiResponse.content = imageAnalysisResponse.text || "Error: No response received.";
         }
-      }
+      } 
 
-      // ✅ FIXED: Image Generation
       else if (mode === "imageGeneration") {
         toast({
           title: "Generating image...",
           description: "Please wait while the AI creates an image.",
         });
 
-        try {
-          console.log("🎨 Generating image with prompt:", content);
-          const generatedImage = await puter.ai.txt2img(content);
-          console.log("🎨 Generated Image Response:", generatedImage);
+        // ✅ Ensure image generation works correctly
+        const generatedImage = await puter.ai.txt2img(content);
+        console.log("Generated Image:", generatedImage);
 
-          if (generatedImage?.url || generatedImage?.src) {
-            aiResponse.content = "Here's your generated image.";
-            aiResponse.imageUrl = generatedImage.url || generatedImage.src;
-            aiResponse.imageAlt = "Generated AI image";
-            aiResponse.isGeneratedImage = true;
-          } else {
-            aiResponse.content = "Error: Image generation failed.";
-          }
-        } catch (error) {
-          console.error("❌ Image Generation Error:", error);
-          aiResponse.content = "Error: Failed to generate image.";
+        if (generatedImage && generatedImage.url) {
+          aiResponse.content = "Here's your generated image.";
+          aiResponse.imageUrl = generatedImage.url;
+          aiResponse.imageAlt = "Generated AI image";
+          aiResponse.isGeneratedImage = true;
+        } else {
+          aiResponse.content = "Error: Image generation failed.";
         }
       }
 
       addMessage(aiResponse);
     } catch (error) {
-      console.error("❌ Puter AI Error:", error);
+      console.error("Puter AI Error:", error);
       toast({
         title: "Error",
         description: "Failed to process your request. Please try again.",
